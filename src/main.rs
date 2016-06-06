@@ -28,15 +28,25 @@ use argparse::{ArgumentParser, Store};
 
 fn main() {
     //let mut inputfile = "".to_string();
+    let mut saddr = "".to_string();
+    let mut rate = 0;
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Performs pings to IP-addresses received from STDIN");
         //ap.refer(&mut inputfile)
         //.add_argument("FILE", Store, "File to read");
+        ap.refer(&mut saddr)
+        .add_option(&["-s", "--source-address"], Store, "Source IP");
+        ap.refer(&mut rate)
+        .add_option(&["-r", "--rate-limit"], Store, "Rate-limit packets per second");
         ap.parse_args_or_exit();
     }
     
     let sock = net::get_icmp_socket().expect("Could not create socket");
+
+    if !saddr.is_empty() {
+        net::bind_to_ip(sock, &saddr).expect("Could not bind socket to source address");
+    }
 
     let mut buffer = String::new();
     let stdin = io::stdin();

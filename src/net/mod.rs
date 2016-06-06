@@ -25,7 +25,7 @@ use std::io::Error;
 use std::thread::sleep;
 use std::time::Duration;
 extern crate libc;
-use libc::{c_int, c_void, socket, sendto, AF_INET, SOCK_RAW, sockaddr_in, in_addr, sockaddr};
+use libc::{c_int, c_void, socket, sendto, AF_INET, SOCK_RAW, sockaddr_in, in_addr, sockaddr, bind};
 static IPPROTO_ICMP: c_int = 1;
 
 /*#[derive(Debug)]
@@ -127,20 +127,32 @@ pub fn get_icmp_socket() -> Result<i32, String> {
     Ok(handle)
 }
 
+pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
+    let addr = string_to_sockaddr(ip);
+    let retval = unsafe { bind(handle, &addr as *const sockaddr, 16) };
+    if retval != 0 {
+        return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+    }
+    Ok(())
+}
+
 fn string_to_ip(ip: &str) -> Vec<u32> {
     ip.split(".").map(|x| x.parse::<u32>().expect("Invalid IP-address")).collect()
 }
 
-pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32, String> {
-    let dest_ip = string_to_ip(destination);
-    
-    let addr = sockaddr_in { 
-     sin_family: AF_INET as u16,
-     sin_port: 0, 
-     sin_addr: in_addr{ s_addr: (dest_ip[3]<<24 | dest_ip[2]<<16 | dest_ip[1]<<8 | dest_ip[0]) as u32}, 
-     sin_zero: [0; 8]
+fn string_to_sockaddr(ip: &str) -> sockaddr {
+    let dest_ip = string_to_ip(ip);
+    let addr = sockaddr_in {
+        sin_family: AF_INET as u16,
+        sin_port: 0,
+        sin_addr: in_addr{ s_addr: (dest_ip[3]<<24 | dest_ip[2]<<16 | dest_ip[1]<<8 | dest_ip[0]) as u32}, 
+        sin_zero: [0; 8]
     };
-    let addr: sockaddr = unsafe {mem::transmute(addr)};
+    unsafe {mem::transmute(addr)}
+}
+
+pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32, String> {
+    let addr = string_to_sockaddr(destination); 
     
     let mut pktlength = -1;
     while pktlength == -1 {
