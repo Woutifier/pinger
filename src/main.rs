@@ -23,8 +23,10 @@
 mod net;
 extern crate libc;
 extern crate argparse;
+extern crate schedule_recv;
 use std::io::{self, Read, BufRead};
 use argparse::{ArgumentParser, Store};
+use schedule_recv::periodic_ms;
 
 fn main() {
     //let mut inputfile = "".to_string();
@@ -53,9 +55,21 @@ fn main() {
     let mut handle = stdin.lock();
 
     let icmpheader = net::ICMPHeader::echo_request(1337, 1).to_byte_array();
+
+    let timer = periodic_ms(1000);
+    let mut counter = 0;
     while handle.read_line(&mut buffer).unwrap() > 0 {
         net::send_packet(sock, buffer.trim(), &icmpheader).expect("Could not send packet");
         buffer.clear();
+        if rate > 0 { 
+            counter += 1;
+            if counter == rate {
+                counter = 0;
+                timer.recv().unwrap();
+                while timer.try_recv().is_ok() {
+                }
+            }
+        }
     }
 }
 
