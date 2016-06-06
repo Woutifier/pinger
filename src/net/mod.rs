@@ -119,7 +119,7 @@ impl ICMPHeader {
     }
 }
 
-pub fn get_icmp_socket() -> Result<i32, String> {
+pub fn new_icmp_socket() -> Result<i32, String> {
     let handle = unsafe { socket(AF_INET, SOCK_RAW, IPPROTO_ICMP) };
     if handle == -1 {
         return Err(::std::error::Error::description(&Error::last_os_error()).to_string());

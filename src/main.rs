@@ -42,7 +42,7 @@ fn main() {
         ap.parse_args_or_exit();
     }
     
-    let sock = net::get_icmp_socket().expect("Could not create socket");
+    let sock = net::new_icmp_socket().expect("Could not create socket");
 
     if !saddr.is_empty() {
         net::bind_to_ip(sock, &saddr).expect("Could not bind socket to source address");
