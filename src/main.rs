@@ -21,15 +21,14 @@
 //SOFTWARE.
 
 mod net;
+mod tbf;
 extern crate libc;
 extern crate argparse;
-extern crate schedule_recv;
-use std::io::{self, Read, BufRead};
+extern crate time;
+use std::io::{self, BufRead};
 use argparse::{ArgumentParser, Store};
-use schedule_recv::periodic_ms;
 
 fn main() {
-    //let mut inputfile = "".to_string();
     let mut saddr = "".to_string();
     let mut rate = 0;
     {
@@ -43,6 +42,7 @@ fn main() {
         .add_option(&["-r", "--rate-limit"], Store, "Rate-limit packets per second");
         ap.parse_args_or_exit();
     }
+
     
     let sock = net::new_icmp_socket().expect("Could not create socket");
 
@@ -56,20 +56,15 @@ fn main() {
 
     let icmpheader = net::ICMPHeader::echo_request(1337, 1).to_byte_array();
 
-    let timer = periodic_ms(1000);
-    let mut counter = 0;
+    let mut tbf = tbf::TokenBucketFilter::new(rate);
+
     while handle.read_line(&mut buffer).unwrap() > 0 {
+        //Ratelimiting
+        tbf.take();
+
+        //Send packet
         net::send_packet(sock, buffer.trim(), &icmpheader).expect("Could not send packet");
         buffer.clear();
-        if rate > 0 { 
-            counter += 1;
-            if counter == rate {
-                counter = 0;
-                timer.recv().unwrap();
-                while timer.try_recv().is_ok() {
-                }
-            }
-        }
     }
 }
 
