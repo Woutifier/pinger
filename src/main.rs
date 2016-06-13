@@ -29,13 +29,12 @@ use std::io::{self, BufRead};
 use argparse::{ArgumentParser, Store};
 
 fn main() {
+    //Read arguments from commandline
     let mut saddr = "".to_string();
     let mut rate = 0;
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Performs pings to IP-addresses received from STDIN");
-        //ap.refer(&mut inputfile)
-        //.add_argument("FILE", Store, "File to read");
         ap.refer(&mut saddr)
         .add_option(&["-s", "--source-address"], Store, "Source IP");
         ap.refer(&mut rate)
@@ -43,23 +42,27 @@ fn main() {
         ap.parse_args_or_exit();
     }
 
-    
+    //Setup socket & (optionally) bind address
     let sock = net::new_icmp_socket().expect("Could not create socket");
 
     if !saddr.is_empty() {
         net::bind_to_ip(sock, &saddr).expect("Could not bind socket to source address");
     }
 
+    //Read from STDIN
     let mut buffer = String::new();
     let stdin = io::stdin();
     let mut handle = stdin.lock();
 
+    //Create new ICMP-header
     let icmpheader = net::ICMPHeader::echo_request(1337, 1).to_byte_array();
 
+    //Initialize TokenBucketFilter for rate-limiting
     let mut tbf = tbf::TokenBucketFilter::new(rate);
 
+    //Send packets in a while loop from STDIN
     while handle.read_line(&mut buffer).unwrap() > 0 {
-        //Ratelimiting
+        //Ratelimit
         tbf.take();
 
         //Send packet
