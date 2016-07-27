@@ -136,8 +136,12 @@ pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn string_to_ip(ip: &str) -> Vec<u32> {
-    ip.split(".").map(|x| x.parse::<u32>().expect("Invalid IP-address")).collect()
+fn string_to_ip(ip: &str) -> Option<Vec<u32>> {
+    let result = ip.split(".").map(|x| x.parse::<u32>()).filter(|x| x.is_ok()).map(|x| x.unwrap()).collect();
+    if result.len() == 4 {
+	return Some(result);
+    }
+    None
 }
 
 fn string_to_sockaddr(ip: &str) -> sockaddr {
