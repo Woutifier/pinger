@@ -22,6 +22,8 @@
 
 extern crate time;
 use time::precise_time_ns;
+use std::time::Duration;
+use std::thread;
 
 pub struct TokenBucketFilter {
     enabled: bool,
@@ -52,6 +54,8 @@ impl TokenBucketFilter {
                 let tokens = diff_time/self.ns_per_packet;
                 self.bucket = ::std::cmp::min(self.bucket + tokens, self.rate);
                 self.last_time = current_time;
+            } else {
+                thread::sleep(Duration::from_millis(1));
             }
         }
         self.bucket -= 1;

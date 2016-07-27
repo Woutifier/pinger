@@ -161,7 +161,7 @@ pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32,
         if pktlength == -1 {
             let syserr = Error::last_os_error();
             if syserr.raw_os_error().is_some() && syserr.raw_os_error().unwrap() == 105 {
-                sleep(Duration::from_millis(10));
+                sleep(Duration::from_millis(1));
             } else {
                 println!("Error: {}",syserr);
                 return Err(::std::error::Error::description(&syserr).to_string()); 
