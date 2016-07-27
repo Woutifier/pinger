@@ -129,35 +129,41 @@ pub fn new_icmp_socket() -> Result<i32, String> {
 
 pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     let addr = string_to_sockaddr(ip);
+    if let Some(addr) = addr {
     let retval = unsafe { bind(handle, &addr as *const sockaddr, 16) };
     if retval != 0 {
         return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
     }
-    Ok(())
+    return Ok(());
+    }
+    Err("Invalid IP-address".to_string())
 }
 
 fn string_to_ip(ip: &str) -> Option<Vec<u32>> {
-    let result = ip.split(".").map(|x| x.parse::<u32>()).filter(|x| x.is_ok()).map(|x| x.unwrap()).collect();
+    let result: Vec<u32> = ip.split(".").map(|x| x.parse::<u32>()).filter(|x| x.is_ok()).map(|x| x.unwrap()).collect();
     if result.len() == 4 {
 	return Some(result);
     }
     None
 }
 
-fn string_to_sockaddr(ip: &str) -> sockaddr {
+fn string_to_sockaddr(ip: &str) -> Option<sockaddr> {
     let dest_ip = string_to_ip(ip);
+    if let Some(dest_ip) = dest_ip {
     let addr = sockaddr_in {
         sin_family: AF_INET as u16,
         sin_port: 0,
         sin_addr: in_addr{ s_addr: (dest_ip[3]<<24 | dest_ip[2]<<16 | dest_ip[1]<<8 | dest_ip[0]) as u32}, 
         sin_zero: [0; 8]
     };
-    unsafe {mem::transmute(addr)}
+        return Some(unsafe {mem::transmute(addr)});
+    }
+    None
 }
 
 pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32, String> {
     let addr = string_to_sockaddr(destination); 
-    
+    if let Some(addr) = addr { 
     let mut pktlength = -1;
     while pktlength == -1 {
         pktlength = unsafe { sendto(handle, buffer.as_ptr() as *mut c_void, buffer.len(), 0, &addr as *const sockaddr, 16) };
@@ -172,7 +178,9 @@ pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32,
             }
         }
     }
-    Ok(pktlength as u32)
+    return Ok(pktlength as u32)
+    }
+    Err("Invalid IP-address".to_string())
 }
 
 #[cfg(test)]

@@ -66,7 +66,10 @@ fn main() {
         tbf.take();
 
         //Send packet
-        net::send_packet(sock, buffer.trim(), &icmpheader).expect("Could not send packet");
+        let result = net::send_packet(sock, buffer.trim(), &icmpheader);
+        if result.is_err() {
+            println!("Could not send packet");
+        }
         buffer.clear();
     }
 }
