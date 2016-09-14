@@ -1,104 +1,74 @@
-//MIT License
+// MIT License
 //
-//Copyright (c) 2016 Wouter B. de Vries
+// Copyright (c) 2016 Wouter B. de Vries
 //
-//Permission is hereby granted, free of charge, to any person obtaining a copy
-//of this software and associated documentation files (the "Software"), to deal
-//in the Software without restriction, including without limitation the rights
-//to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-//copies of the Software, and to permit persons to whom the Software is
-//furnished to do so, subject to the following conditions:
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 //
-//The above copyright notice and this permission notice shall be included in all
-//copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
 //
-//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-//FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-//AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-//LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-//SOFTWARE.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+extern crate byteorder;
+extern crate libc;
 
 use std::mem;
-use std::io::Error;
+use std::io::{Error, Cursor};
 use std::thread::sleep;
 use std::time::Duration;
-extern crate libc;
-use libc::{c_int, c_void, socket, sendto, AF_INET, SOCK_RAW, sockaddr_in, in_addr, sockaddr, bind};
+use std::net::{Ipv6Addr, IpAddr};
+use std::str::FromStr;
+
+// Use other than std
+use libc::{c_int, c_void, socket, sendto, AF_INET, AF_INET6, SOCK_RAW, sockaddr_in, sockaddr_in6,
+           in_addr, sockaddr, bind};
+use self::byteorder::{ReadBytesExt, LittleEndian};
+
+// Static values
 static IPPROTO_ICMP: c_int = 1;
-
-/*#[derive(Debug)]
-struct Ipv4Header {
-    ver_hlen: u8,
-    services: u8,
-    len: u16,
-    id: u16,
-    flags_fragment: u16,
-    ttl: u8,
-    proto: u8,
-    checksum: u16,
-    src: u32,
-    dst: u32,
-}
-
-impl Ipv4Header {
-    fn new_header() -> Ipv4Header {
-        let header = Ipv4Header { ver_hlen: (4<<4 | 5) & 0xff, services: 0, len: 5, id: 1337, flags_fragment: 0, ttl: 255, proto: 1, checksum: 0, src: 0, dst: 0 };
-        header
-    }
-    fn to_byte_array(&self) -> [u8; 20] {
-        let mut buffer = [0; 20];
-        buffer[0] = self.ver_hlen;
-        buffer[1] = self.services;
-        buffer[2] = (self.len>>8 & 0xFF) as u8;
-        buffer[3] = (self.len & 0xFF) as u8;
-        buffer[4] = (self.id>>8 & 0xFF) as u8;
-        buffer[5] = (self.id & 0xFF) as u8;
-        buffer[6] = (self.flags_fragment>>8 & 0xFF) as u8;
-        buffer[7] = (self.flags_fragment & 0xFF) as u8;
-        buffer[8] = self.ttl;
-        buffer[9] = self.proto;
-        buffer[10] = (self.checksum>>8 & 0xFF) as u8;
-        buffer[11] = (self.checksum & 0xFF) as u8;
-        buffer[12] = (self.src>>24 & 0xFF) as u8;
-        buffer[13] = (self.src>>16 & 0xFF) as u8;
-        buffer[14] = (self.src>>8 & 0xFF) as u8;
-        buffer[15] = (self.src & 0xFF) as u8;
-        buffer[16] = (self.dst>>24 & 0xFF) as u8;
-        buffer[17] = (self.dst>>16 & 0xFF) as u8;
-        buffer[18] = (self.dst>>8 & 0xFF) as u8;
-        buffer[19] = (self.dst & 0xFF) as u8;
-        buffer
-    }
-}*/
+static IPPROTO_ICMPV6: c_int = 58;
 
 #[derive(Debug)]
-pub struct ICMPHeader {
+pub struct ICMP6Header {
     pub icmp_type: u8,
     pub code: u8,
     pub checksum: u16,
-    pub header: u32
+    pub header: u32,
 }
 
-impl ICMPHeader {
-    pub fn echo_request(identifier: u16, sequence_number: u16) -> ICMPHeader {
-        let header = ((identifier as u32)<<16)  | (sequence_number as u32);
-        let mut icmpheader = ICMPHeader { icmp_type: 8, code: 0, checksum: 0, header: header };
-        let checksum = ICMPHeader::calc_checksum(&icmpheader.to_byte_array());
-        icmpheader.checksum = checksum;
-        icmpheader
+impl ICMP6Header {
+    pub fn echo_request(identifier: u16, sequence_number: u16) -> ICMP6Header {
+        let header = ((identifier as u32) << 16) | (sequence_number as u32);
+        let mut icmp6_header = ICMP6Header {
+            icmp_type: 128,
+            code: 0,
+            checksum: 0,
+            header: header,
+        };
+        let checksum = ICMP6Header::calc_checksum(&icmp6_header.to_byte_array());
+        icmp6_header.checksum = checksum;
+        icmp6_header
     }
- 
+
     pub fn to_byte_array(&self) -> [u8; 8] {
-       let mut buffer = [0; 8];
+        let mut buffer = [0; 8];
         buffer[0] = self.icmp_type;
         buffer[1] = self.code;
-        buffer[2] = (self.checksum>>8 & 0xFF) as u8;
+        buffer[2] = (self.checksum >> 8 & 0xFF) as u8;
         buffer[3] = (self.checksum & 0xFF) as u8;
-        buffer[4] = (self.header>>24 & 0xFF) as u8;
-        buffer[5] = (self.header>>16 & 0xFF) as u8;
-        buffer[6] = (self.header>>8 & 0xFF) as u8;
+        buffer[4] = (self.header >> 24 & 0xFF) as u8;
+        buffer[5] = (self.header >> 16 & 0xFF) as u8;
+        buffer[6] = (self.header >> 8 & 0xFF) as u8;
         buffer[7] = (self.header & 0xFF) as u8;
         buffer
     }
@@ -107,11 +77,12 @@ impl ICMPHeader {
         let mut size = buffer.len();
         let mut checksum: u32 = 0;
         while size > 0 {
-            let word = (buffer[buffer.len()-size] as u16)<<8 | (buffer[buffer.len()-size+1]) as u16;
+            let word = (buffer[buffer.len() - size] as u16) << 8 |
+                       (buffer[buffer.len() - size + 1]) as u16;
             checksum += word as u32;
             size -= 2;
         }
-        let remainder = checksum>>16;
+        let remainder = checksum >> 16;
         checksum &= 0xFFFF;
         checksum += remainder;
         checksum ^= 0xFFFF;
@@ -119,7 +90,59 @@ impl ICMPHeader {
     }
 }
 
-pub fn new_icmp_socket() -> Result<i32, String> {
+#[derive(Debug)]
+pub struct ICMP4Header {
+    pub icmp_type: u8,
+    pub code: u8,
+    pub checksum: u16,
+    pub header: u32,
+}
+
+impl ICMP4Header {
+    pub fn echo_request(identifier: u16, sequence_number: u16) -> ICMP4Header {
+        let header = ((identifier as u32) << 16) | (sequence_number as u32);
+        let mut icmp4_header = ICMP4Header {
+            icmp_type: 8,
+            code: 0,
+            checksum: 0,
+            header: header,
+        };
+        let checksum = ICMP4Header::calc_checksum(&icmp4_header.to_byte_array());
+        icmp4_header.checksum = checksum;
+        icmp4_header
+    }
+
+    pub fn to_byte_array(&self) -> [u8; 8] {
+        let mut buffer = [0; 8];
+        buffer[0] = self.icmp_type;
+        buffer[1] = self.code;
+        buffer[2] = (self.checksum >> 8 & 0xFF) as u8;
+        buffer[3] = (self.checksum & 0xFF) as u8;
+        buffer[4] = (self.header >> 24 & 0xFF) as u8;
+        buffer[5] = (self.header >> 16 & 0xFF) as u8;
+        buffer[6] = (self.header >> 8 & 0xFF) as u8;
+        buffer[7] = (self.header & 0xFF) as u8;
+        buffer
+    }
+
+    fn calc_checksum(buffer: &[u8]) -> u16 {
+        let mut size = buffer.len();
+        let mut checksum: u32 = 0;
+        while size > 0 {
+            let word = (buffer[buffer.len() - size] as u16) << 8 |
+                       (buffer[buffer.len() - size + 1]) as u16;
+            checksum += word as u32;
+            size -= 2;
+        }
+        let remainder = checksum >> 16;
+        checksum &= 0xFFFF;
+        checksum += remainder;
+        checksum ^= 0xFFFF;
+        checksum as u16
+    }
+}
+
+pub fn new_icmpv4_socket() -> Result<i32, String> {
     let handle = unsafe { socket(AF_INET, SOCK_RAW, IPPROTO_ICMP) };
     if handle == -1 {
         return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
@@ -127,81 +150,148 @@ pub fn new_icmp_socket() -> Result<i32, String> {
     Ok(handle)
 }
 
+pub fn new_icmpv6_socket() -> Result<i32, String> {
+    let handle = unsafe { socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6) };
+    if handle == -1 {
+        return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+    }
+    Ok(handle)
+}
+
+fn to_sockaddr(input: SockAddr) -> Option<*const sockaddr> {
+    if let SockAddr::V4(input) = input {
+        return Some((&input as *const sockaddr_in) as *const sockaddr);
+    } else if let SockAddr::V6(input) = input {
+        return Some((&input as *const sockaddr_in6) as *const sockaddr);
+    }
+    None
+}
+
 pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     let addr = string_to_sockaddr(ip);
     if let Some(addr) = addr {
-    let retval = unsafe { bind(handle, &addr as *const sockaddr, 16) };
-    if retval != 0 {
-        return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
-    }
-    return Ok(());
+        let retval = unsafe { bind(handle, to_sockaddr(addr).unwrap(), 16) };
+        if retval != 0 {
+            return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+        }
+        return Ok(());
     }
     Err("Invalid IP-address".to_string())
 }
 
-fn string_to_ip(ip: &str) -> Option<Vec<u32>> {
-    let result: Vec<u32> = ip.split(".").map(|x| x.parse::<u32>()).filter(|x| x.is_ok()).map(|x| x.unwrap()).collect();
-    if result.len() == 4 {
-	return Some(result);
+enum SockAddr {
+    V4(sockaddr_in),
+    V6(sockaddr_in6),
+}
+
+fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
+    let dest_ip = IpAddr::from_str(ip);
+    if let Ok(IpAddr::V4(dest_ip)) = dest_ip {
+        let mut ipcursor = Cursor::new(dest_ip.octets());
+        let addr = sockaddr_in {
+            sin_family: AF_INET as u16,
+            sin_port: 0,
+            sin_addr: in_addr { s_addr: ipcursor.read_u32::<LittleEndian>().unwrap() },
+            sin_zero: [0; 8],
+        };
+        return Some(SockAddr::V4(addr));
+    } else if let Ok(IpAddr::V6(dest_ip)) = dest_ip {
+        let addr = sockaddr_in6 {
+            sin6_flowinfo: 0,
+            sin6_port: 0,
+            sin6_scope_id: 0,
+            sin6_family: AF_INET6 as u16,
+            sin6_addr: init_in6_addr(dest_ip),
+        };
+        return Some(SockAddr::V6(addr));
     }
     None
 }
 
-fn string_to_sockaddr(ip: &str) -> Option<sockaddr> {
-    let dest_ip = string_to_ip(ip);
-    if let Some(dest_ip) = dest_ip {
-    let addr = sockaddr_in {
-        sin_family: AF_INET as u16,
-        sin_port: 0,
-        sin_addr: in_addr{ s_addr: (dest_ip[3]<<24 | dest_ip[2]<<16 | dest_ip[1]<<8 | dest_ip[0]) as u32}, 
-        sin_zero: [0; 8]
+// Todo: this function needs cleaning up
+fn init_in6_addr(addr: Ipv6Addr) -> libc::in6_addr {
+    let mut bytes = addr.segments();
+    bytes.reverse();
+    let mut stuff: [u8; 16] = unsafe { mem::transmute(bytes) };
+    stuff.reverse();
+    unsafe {
+        let mut in6addr: libc::in6_addr = mem::uninitialized();
+        in6addr.s6_addr = stuff;
+        return in6addr;
     };
-        return Some(unsafe {mem::transmute(addr)});
-    }
-    None
 }
 
-pub fn send_packet(handle: i32, destination: &str, buffer: &[u8]) -> Result<u32, String> {
-    let addr = string_to_sockaddr(destination); 
-    if let Some(addr) = addr { 
-    let mut pktlength = -1;
-    while pktlength == -1 {
-        pktlength = unsafe { sendto(handle, buffer.as_ptr() as *mut c_void, buffer.len(), 0, &addr as *const sockaddr, 16) };
-        //sleep(Duration::from_secs(1));
-        if pktlength == -1 {
-            let syserr = Error::last_os_error();
-            if syserr.raw_os_error().is_some() && syserr.raw_os_error().unwrap() == 105 {
-                sleep(Duration::from_millis(1));
-            } else {
-                println!("Error: {}",syserr);
-                return Err(::std::error::Error::description(&syserr).to_string()); 
+pub fn send_packet(handlev4: i32,
+                   handlev6: i32,
+                   destination: &str,
+                   bufferv4: &[u8],
+                   bufferv6: &[u8])
+                   -> Result<u32, String> {
+    let addr = string_to_sockaddr(destination);
+    if let Some(addr) = addr {
+        let mut pktlength = -1;
+        while pktlength == -1 {
+            if let SockAddr::V4(addr) = addr {
+                pktlength = unsafe {
+                    sendto(handlev4,
+                           bufferv4.as_ptr() as *mut c_void,
+                           bufferv4.len(),
+                           0,
+                           (&addr as *const sockaddr_in) as *const sockaddr,
+                           16)
+                };
+            } else if let SockAddr::V6(addr) = addr {
+                pktlength = unsafe {
+                    sendto(handlev6,
+                           bufferv6.as_ptr() as *mut c_void,
+                           bufferv6.len(),
+                           0,
+                           (&addr as *const sockaddr_in6) as *const sockaddr,
+                           28)
+                };
+            }
+            // sleep(Duration::from_secs(1));
+            if pktlength == -1 {
+                let syserr = Error::last_os_error();
+                if syserr.raw_os_error().is_some() && syserr.raw_os_error().unwrap() == 105 {
+                    sleep(Duration::from_millis(1));
+                } else {
+                    println!("Error: {}", syserr);
+                    return Err(::std::error::Error::description(&syserr).to_string());
+                }
             }
         }
-    }
-    return Ok(pktlength as u32)
+        return Ok(pktlength as u32);
     }
     Err("Invalid IP-address".to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ICMPHeader;
+    use super::ICMP4Header;
 
     #[test]
     fn checksum() {
-        //Example from some other source
-        let test1 = vec![0b00001000u8, 0b00000000u8, 0b00000000u8,
-        0b00000000u8, 0b00000000u8, 0b00000001u8, 0b00000000u8,
-        0b00001001u8, 0b01010100u8, 0b01000101u8, 0b01010011u8,
-        0b01010100u8];
-        let mut checksum = ICMPHeader::calc_checksum(&test1);
+        // Example from some other source
+        let test1 = vec![0b00001000u8,
+                         0b00000000u8,
+                         0b00000000u8,
+                         0b00000000u8,
+                         0b00000000u8,
+                         0b00000001u8,
+                         0b00000000u8,
+                         0b00001001u8,
+                         0b01010100u8,
+                         0b01000101u8,
+                         0b01010011u8,
+                         0b01010100u8];
+        let mut checksum = ICMP4Header::calc_checksum(&test1);
         assert_eq!(checksum, 20572);
-        
-        //Example from wikipedia IPV4
-        let test2 = vec![0x45u8, 0x00, 0x00, 0x73, 0x40, 0x00,
-        0x40, 0x11, 0x00, 0x00, 0xc0, 0xa8, 0x00, 0x01, 0xc0,
-        0xa8, 0x00, 0xc7];
-        checksum = ICMPHeader::calc_checksum(&test2);
+
+        // Example from wikipedia IPV4
+        let test2 = vec![0x45u8, 0x00, 0x00, 0x73, 0x40, 0x00, 0x40, 0x11, 0x00, 0x00, 0xc0, 0xa8,
+                         0x00, 0x01, 0xc0, 0xa8, 0x00, 0xc7];
+        checksum = ICMP4Header::calc_checksum(&test2);
         assert_eq!(checksum, 0xb861);
     }
 }
