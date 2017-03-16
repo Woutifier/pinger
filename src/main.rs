@@ -32,6 +32,8 @@ fn main() {
     // Read arguments from commandline
     let mut saddr = "".to_string();
     let mut rate = 0;
+    let mut identifier = 1337;
+    let mut sequence_number = 1;
     {
         let mut ap = ArgumentParser::new();
         ap.set_description("Performs pings to IP-addresses received from STDIN");
@@ -41,6 +43,14 @@ fn main() {
           .add_option(&["-r", "--rate-limit"],
                       Store,
                       "Rate-limit packets per second");
+        ap.refer(&mut identifier)
+          .add_option(&["-i", "--identifier"],
+                        Store,
+                        "Identifier value to use in Echo Request");
+        ap.refer(&mut sequence_number)
+            .add_option(&["-n", "--sequence-number"],
+                        Store,
+                        "Sequence number to use in Echo Request");
         ap.parse_args_or_exit();
     }
 
@@ -58,8 +68,8 @@ fn main() {
     let mut handle = stdin.lock();
 
     // Create new ICMP-header (IPv4 and IPv6)
-    let icmp4header = net::ICMP4Header::echo_request(1337, 1).to_byte_array();
-    let icmp6header = net::ICMP6Header::echo_request(1337, 1).to_byte_array();
+    let icmp4header = net::ICMP4Header::echo_request(identifier, sequence_number).to_byte_array();
+    let icmp6header = net::ICMP6Header::echo_request(identifier, sequence_number).to_byte_array();
 
     // Initialize TokenBucketFilter for rate-limiting
     let mut tbf = tbf::TokenBucketFilter::new(rate);
