@@ -56,12 +56,13 @@ fn main() {
 
     // Setup socket & (optionally) bind address
     let sockv4 = net::new_icmpv4_socket().expect("Could not create socket (v4)");
-    let sockv6 = net::new_icmpv6_socket().expect("Could not create socket (v6)");
-
     if !saddr.is_empty() {
         net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
     }
 
+    let sockv6 = net::new_icmpv6_socket().expect("Could not create socket (v6)");
+
+    
     // Read from STDIN
     let mut buffer = String::new();
     let stdin = io::stdin();
