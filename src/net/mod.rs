@@ -38,6 +38,11 @@ use self::byteorder::{ReadBytesExt, LittleEndian};
 static IPPROTO_ICMP: c_int = 1;
 static IPPROTO_ICMPV6: c_int = 58;
 
+enum SockAddr {
+    V4(sockaddr_in),
+    V6(sockaddr_in6),
+}
+
 #[derive(Debug)]
 pub struct ICMP6Header {
     pub icmp_type: u8,
@@ -179,15 +184,12 @@ pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     Err("Invalid IP-address".to_string())
 }
 
-enum SockAddr {
-    V4(sockaddr_in),
-    V6(sockaddr_in6),
-}
 
 fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
     let dest_ip = IpAddr::from_str(ip);
     if let Ok(IpAddr::V4(dest_ip)) = dest_ip {
         let mut ipcursor = Cursor::new(dest_ip.octets());
+        //println!("{:?}", ipcursor.read_u32::<LittleEndian>().unwrap());
         let addr = sockaddr_in {
             sin_family: AF_INET as u16,
             sin_port: 0,
