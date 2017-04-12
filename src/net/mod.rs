@@ -265,7 +265,7 @@ pub fn send_packet(handlev4: i32,
         }
         return Ok(pktlength as u32);
     }
-    Err("Invalid IP-address".to_string())
+    Err(format!("Invalid IP-Address: {}", destination))
 }
 
 #[cfg(test)]
