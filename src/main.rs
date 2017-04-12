@@ -82,8 +82,8 @@ fn main() {
 
         // Send packet
         let result = net::send_packet(sockv4, sockv6, buffer.trim(), &icmp4header, &icmp6header);
-        if result.is_err() {
-            println!("Could not send packet");
+        if let Err(msg) = result {
+            println!("Could not send packet: {}", msg);
         }
         buffer.clear();
     }
