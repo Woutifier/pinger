@@ -101,24 +101,44 @@ pub struct ICMP4Header {
     pub code: u8,
     pub checksum: u16,
     pub header: u32,
+    pub payload_sec: u64,
+    pub payload_nanosec: u32,
+    pub dest_part1: u8,
+    pub dest_part2: u8,
+    pub dest_part3: u8,
+    pub dest_part4: u8,
 }
 
 impl ICMP4Header {
-    pub fn echo_request(identifier: u16, sequence_number: u16) -> ICMP4Header {
+    pub fn echo_request(identifier: u16, sequence_number: u16, payload_sec: u64, payload_nanosec: u32, dest_ip: &str) -> ICMP4Header {
         let header = ((identifier as u32) << 16) | (sequence_number as u32);
+
+        let split = dest_ip.split(".");
+        let vec: Vec<&str> = split.collect();		
+        let first_part: u8 = vec[0].parse().unwrap();
+        let second_part: u8 = vec[1].parse().unwrap();
+        let third_part: u8 = vec[2].parse().unwrap();
+        let fourth_part: u8 = vec[3].parse().unwrap();
+
         let mut icmp4_header = ICMP4Header {
             icmp_type: 8,
             code: 0,
             checksum: 0,
             header: header,
+            payload_sec: payload_sec,
+            payload_nanosec: payload_nanosec,
+            dest_part1: first_part,
+            dest_part2: second_part,
+            dest_part3: third_part,
+            dest_part4: fourth_part,
         };
         let checksum = ICMP4Header::calc_checksum(&icmp4_header.to_byte_array());
         icmp4_header.checksum = checksum;
         icmp4_header
     }
 
-    pub fn to_byte_array(&self) -> [u8; 8] {
-        let mut buffer = [0; 8];
+    pub fn to_byte_array(&self) -> [u8; 24] {
+        let mut buffer = [0; 24];
         buffer[0] = self.icmp_type;
         buffer[1] = self.code;
         buffer[2] = (self.checksum >> 8 & 0xFF) as u8;
@@ -127,6 +147,23 @@ impl ICMP4Header {
         buffer[5] = (self.header >> 16 & 0xFF) as u8;
         buffer[6] = (self.header >> 8 & 0xFF) as u8;
         buffer[7] = (self.header & 0xFF) as u8;
+        buffer[8] = (self.dest_part1 & 0xFF) as u8;
+        buffer[9] = (self.dest_part2 & 0xFF) as u8;
+        buffer[10] = (self.dest_part3 & 0xFF) as u8;
+        buffer[11] = (self.dest_part4 & 0xFF) as u8;
+        buffer[12] = (self.payload_sec >> 56 & 0xFF) as u8;
+        buffer[13] = (self.payload_sec >> 48 & 0xFF) as u8;
+        buffer[14] = (self.payload_sec >> 40 & 0xFF) as u8;
+        buffer[15] = (self.payload_sec >> 32 & 0xFF) as u8;
+        buffer[16] = (self.payload_sec >> 24 & 0xFF) as u8;
+        buffer[17] = (self.payload_sec >> 16 & 0xFF) as u8;
+        buffer[18] = (self.payload_sec >> 8 & 0xFF) as u8;
+        buffer[19] = (self.payload_sec & 0xFF) as u8;
+        buffer[20] = (self.payload_nanosec >> 24 & 0xFF) as u8;
+        buffer[21] = (self.payload_nanosec >> 16 & 0xFF) as u8;
+        buffer[22] = (self.payload_nanosec >> 8 & 0xFF) as u8;
+        buffer[23] = (self.payload_nanosec & 0xFF) as u8;
+
         buffer
     }
 
@@ -174,6 +211,7 @@ fn to_sockaddr(input: SockAddr) -> Option<*const sockaddr> {
 
 pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     let addr = string_to_sockaddr(ip);
+	// println!("Bolod:{}", ip);
     if let Some(addr) = addr {
         let retval = unsafe { bind(handle, to_sockaddr(addr).unwrap(), 16) };
         if retval != 0 {

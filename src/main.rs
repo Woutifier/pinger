@@ -27,6 +27,7 @@ extern crate argparse;
 extern crate time;
 use std::io::{self, BufRead};
 use argparse::{ArgumentParser, Store};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() {
     // Read arguments from commandline
@@ -57,6 +58,7 @@ fn main() {
     // Setup socket & (optionally) bind address
     let sockv4 = net::new_icmpv4_socket().expect("Could not create socket (v4)");
     if !saddr.is_empty() {
+		// println!("Could not send packet:{}", saddr);
         net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
     }
 
@@ -69,7 +71,6 @@ fn main() {
     let mut handle = stdin.lock();
 
     // Create new ICMP-header (IPv4 and IPv6)
-    let icmp4header = net::ICMP4Header::echo_request(identifier, sequence_number).to_byte_array();
     let icmp6header = net::ICMP6Header::echo_request(identifier, sequence_number).to_byte_array();
 
     // Initialize TokenBucketFilter for rate-limiting
@@ -79,6 +80,12 @@ fn main() {
     while handle.read_line(&mut buffer).unwrap() > 0 {
         // Ratelimit
         tbf.take();
+        
+        // Finding timestamp
+        let now = SystemTime::now();
+        let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+
+        let icmp4header = net::ICMP4Header::echo_request(identifier, sequence_number, since_the_epoch.as_secs(), since_the_epoch.subsec_nanos(), buffer.trim()).to_byte_array();
 
         // Send packet
         let result = net::send_packet(sockv4, sockv6, buffer.trim(), &icmp4header, &icmp6header);
