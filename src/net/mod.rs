@@ -211,7 +211,6 @@ fn to_sockaddr(input: SockAddr) -> Option<*const sockaddr> {
 
 pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
     let addr = string_to_sockaddr(ip);
-	// println!("Bolod:{}", ip);
     if let Some(addr) = addr {
         let retval = unsafe { bind(handle, to_sockaddr(addr).unwrap(), 16) };
         if retval != 0 {

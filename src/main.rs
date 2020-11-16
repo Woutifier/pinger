@@ -58,7 +58,6 @@ fn main() {
     // Setup socket & (optionally) bind address
     let sockv4 = net::new_icmpv4_socket().expect("Could not create socket (v4)");
     if !saddr.is_empty() {
-		// println!("Could not send packet:{}", saddr);
         net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
     }
 
