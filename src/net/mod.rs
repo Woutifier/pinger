@@ -159,19 +159,15 @@ pub fn new_icmpv6_socket() -> Result<i32> {
     Ok(handle)
 }
 
-fn to_sockaddr(input: SockAddr) -> Option<*const sockaddr> {
-    if let SockAddr::V4(input) = input {
-        return Some((&input as *const sockaddr_in) as *const sockaddr);
-    } else if let SockAddr::V6(input) = input {
-        return Some((&input as *const sockaddr_in6) as *const sockaddr);
-    }
-    None
-}
-
 pub fn bind_to_ip(handle: i32, ip: &str) -> Result<()> {
     let addr = string_to_sockaddr(ip);
     if let Some(addr) = addr {
-        let retval = unsafe { bind(handle, to_sockaddr(addr).unwrap(), 16) };
+        // Cast address from sockaddr_in/sockaddr_in6 to sockaddr
+        let cast_addr = match &addr {
+            SockAddr::V4(input) => (input as *const sockaddr_in) as *const sockaddr,
+            SockAddr::V6(input) => (input as *const sockaddr_in6) as *const sockaddr
+        };
+        let retval = unsafe { bind(handle, cast_addr, 16) };
         if retval != 0 {
             return Err(anyhow!(Error::last_os_error()));
         }
