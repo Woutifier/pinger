@@ -19,20 +19,16 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-extern crate byteorder;
-extern crate libc;
-
-use std::mem;
-use std::io::{Error, Cursor};
+use std::str::FromStr;
 use std::thread::sleep;
 use std::time::Duration;
-use std::net::{Ipv6Addr, IpAddr};
-use std::str::FromStr;
+use std::io::{Cursor, Error};
+use std::net::{IpAddr, Ipv6Addr};
 
-// Use other than std
-use libc::{c_int, c_void, socket, sendto, AF_INET, AF_INET6, SOCK_RAW, sockaddr_in, sockaddr_in6,
-           in_addr, sockaddr, bind};
-use self::byteorder::{ReadBytesExt, LittleEndian};
+use anyhow::{anyhow, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use libc::{AF_INET, AF_INET6, bind, c_int, c_void, in_addr, sendto, SOCK_RAW, sockaddr,
+           sockaddr_in, sockaddr_in6, socket};
 
 // Static values
 static IPPROTO_ICMP: c_int = 1;
@@ -147,18 +143,18 @@ impl ICMP4Header {
     }
 }
 
-pub fn new_icmpv4_socket() -> Result<i32, String> {
+pub fn new_icmpv4_socket() -> Result<i32> {
     let handle = unsafe { socket(AF_INET, SOCK_RAW, IPPROTO_ICMP) };
     if handle == -1 {
-        return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+        return Err(anyhow!(Error::last_os_error().to_string()));
     }
     Ok(handle)
 }
 
-pub fn new_icmpv6_socket() -> Result<i32, String> {
+pub fn new_icmpv6_socket() -> Result<i32> {
     let handle = unsafe { socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6) };
     if handle == -1 {
-        return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+        return Err(anyhow!(Error::last_os_error().to_string()));
     }
     Ok(handle)
 }
@@ -172,16 +168,16 @@ fn to_sockaddr(input: SockAddr) -> Option<*const sockaddr> {
     None
 }
 
-pub fn bind_to_ip(handle: i32, ip: &str) -> Result<(), String> {
+pub fn bind_to_ip(handle: i32, ip: &str) -> Result<()> {
     let addr = string_to_sockaddr(ip);
     if let Some(addr) = addr {
         let retval = unsafe { bind(handle, to_sockaddr(addr).unwrap(), 16) };
         if retval != 0 {
-            return Err(::std::error::Error::description(&Error::last_os_error()).to_string());
+            return Err(anyhow!(Error::last_os_error()));
         }
         return Ok(());
     }
-    Err("Invalid IP-address".to_string())
+    Err(anyhow!("Invalid IP-address"))
 }
 
 
@@ -189,7 +185,6 @@ fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
     let dest_ip = IpAddr::from_str(ip);
     if let Ok(IpAddr::V4(dest_ip)) = dest_ip {
         let mut ipcursor = Cursor::new(dest_ip.octets());
-        //println!("{:?}", ipcursor.read_u32::<LittleEndian>().unwrap());
         let addr = sockaddr_in {
             sin_family: AF_INET as u16,
             sin_port: 0,
@@ -210,17 +205,10 @@ fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
     None
 }
 
-// Todo: this function needs cleaning up
 fn init_in6_addr(addr: Ipv6Addr) -> libc::in6_addr {
-    let mut bytes = addr.segments();
-    bytes.reverse();
-    let mut stuff: [u8; 16] = unsafe { mem::transmute(bytes) };
-    stuff.reverse();
-    unsafe {
-        let mut in6addr: libc::in6_addr = mem::uninitialized();
-        in6addr.s6_addr = stuff;
-        return in6addr;
-    };
+    libc::in6_addr {
+            s6_addr: addr.octets()
+    }
 }
 
 pub fn send_packet(handlev4: i32,
@@ -228,7 +216,7 @@ pub fn send_packet(handlev4: i32,
                    destination: &str,
                    bufferv4: &[u8],
                    bufferv6: &[u8])
-                   -> Result<u32, String> {
+                   -> Result<u32> {
     let addr = string_to_sockaddr(destination);
     if let Some(addr) = addr {
         let mut pktlength = -1;
@@ -259,13 +247,13 @@ pub fn send_packet(handlev4: i32,
                     sleep(Duration::from_millis(1));
                 } else {
                     println!("Error: {}", syserr);
-                    return Err(::std::error::Error::description(&syserr).to_string());
+                    return Err(anyhow!(syserr));
                 }
             }
         }
         return Ok(pktlength as u32);
     }
-    Err(format!("Invalid IP-Address: {}", destination))
+    Err(anyhow!(format!("Invalid IP-Address: {}", destination).to_string()))
 }
 
 #[cfg(test)]

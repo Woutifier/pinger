@@ -1,2 +1,4 @@
 target
 src/ips.txt
+.idea/
+shell.nix

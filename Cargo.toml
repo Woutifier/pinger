@@ -2,9 +2,11 @@
 name = "pinger"
 version = "0.1.0"
 authors = ["Wouter de Vries <wouter@wouter-web.nl>"]
+edition = "2018"
 
 [dependencies]
-libc = "0.2.11"
-argparse = "0.2.1"
+libc = "0.2.84"
+argparse = "0.2.2"
 time = "0.1.35"
-byteorder = "0.5.3"
+byteorder = "1.4.2"
+anyhow = "1.0"
