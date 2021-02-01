@@ -151,6 +151,7 @@ impl ICMP4Header {
         buffer[9] = (self.dest_part2 & 0xFF) as u8;
         buffer[10] = (self.dest_part3 & 0xFF) as u8;
         buffer[11] = (self.dest_part4 & 0xFF) as u8;
+        // adding timestamp
         buffer[12] = (self.payload_sec >> 56 & 0xFF) as u8;
         buffer[13] = (self.payload_sec >> 48 & 0xFF) as u8;
         buffer[14] = (self.payload_sec >> 40 & 0xFF) as u8;
