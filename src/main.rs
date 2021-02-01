@@ -22,9 +22,6 @@
 
 mod net;
 mod tbf;
-extern crate libc;
-extern crate argparse;
-extern crate time;
 use std::io::{self, BufRead};
 use argparse::{ArgumentParser, Store};
 use std::time::{SystemTime, UNIX_EPOCH};
