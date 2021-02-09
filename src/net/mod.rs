@@ -110,11 +110,19 @@ impl ICMP4Header {
         let header = ((identifier as u32) << 16) | (sequence_number as u32);
 
         let split = dest_ip.split(".");
-        let vec: Vec<&str> = split.collect();		
-        let first_part: u8 = vec[0].parse().unwrap();
-        let second_part: u8 = vec[1].parse().unwrap();
-        let third_part: u8 = vec[2].parse().unwrap();
-        let fourth_part: u8 = vec[3].parse().unwrap();
+        let vec: Vec<&str> = split.collect();
+        	
+        let mut first_part: u8 = 0;
+        let mut second_part: u8 = 0;
+        let mut third_part: u8 = 0;
+        let mut fourth_part: u8 = 0;
+
+        if vec.len() == 4 {
+            first_part = vec[0].parse().unwrap();
+            second_part = vec[1].parse().unwrap();
+            third_part = vec[2].parse().unwrap();
+            fourth_part = vec[3].parse().unwrap();
+        }
 
         let mut icmp4_header = ICMP4Header {
             icmp_type: 8,
