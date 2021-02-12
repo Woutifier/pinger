@@ -122,6 +122,8 @@ impl ICMP4Header {
             second_part = vec[1].parse().unwrap();
             third_part = vec[2].parse().unwrap();
             fourth_part = vec[3].parse().unwrap();
+        } else {
+            println!("Could not parse ipv4 address for the payload, putting 0.0.0.0: {}", dest_ip);
         }
 
         let mut icmp4_header = ICMP4Header {
