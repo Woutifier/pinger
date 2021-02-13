@@ -108,22 +108,20 @@ pub struct ICMP4Header {
 impl ICMP4Header {
     pub fn echo_request(identifier: u16, sequence_number: u16, payload_sec: u64, payload_nanosec: u32, dest_ip: &str) -> ICMP4Header {
         let header = ((identifier as u32) << 16) | (sequence_number as u32);
-
-        let split = dest_ip.split(".");
-        let vec: Vec<&str> = split.collect();
-        	
+        
         let mut first_part: u8 = 0;
         let mut second_part: u8 = 0;
         let mut third_part: u8 = 0;
         let mut fourth_part: u8 = 0;
-
-        if vec.len() == 4 {
-            first_part = vec[0].parse().unwrap();
-            second_part = vec[1].parse().unwrap();
-            third_part = vec[2].parse().unwrap();
-            fourth_part = vec[3].parse().unwrap();
-        } else {
-            println!("Could not parse ipv4 address for the payload, putting 0.0.0.0: {}", dest_ip);
+        
+        let ip = IpAddr::from_str(dest_ip);
+        if let Ok(IpAddr::V4(_ip)) = ip {
+            let split = dest_ip.split(".");
+            let vec: Vec<&str> = split.collect();
+            first_part = vec[0].parse().expect("Failed parsing ipv4 address");
+            second_part = vec[1].parse().expect("Failed parsing ipv4 address");
+            third_part = vec[2].parse().expect("Failed parsing ipv4 address");
+            fourth_part = vec[3].parse().expect("Failed parsing ipv4 address");
         }
 
         let mut icmp4_header = ICMP4Header {
@@ -138,6 +136,7 @@ impl ICMP4Header {
             dest_part3: third_part,
             dest_part4: fourth_part,
         };
+        
         let checksum = ICMP4Header::calc_checksum(&icmp4_header.to_byte_array());
         icmp4_header.checksum = checksum;
         icmp4_header
