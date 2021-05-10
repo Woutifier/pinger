@@ -34,7 +34,7 @@ use libc::{AF_INET, AF_INET6, bind, c_int, c_void, in_addr, sendto, SOCK_RAW, so
 static IPPROTO_ICMP: c_int = 1;
 static IPPROTO_ICMPV6: c_int = 58;
 
-enum SockAddr {
+pub enum SockAddr {
     V4(sockaddr_in),
     V6(sockaddr_in6),
 }
@@ -214,7 +214,15 @@ pub fn bind_to_ip(handle: i32, ip: &str) -> Result<()> {
             SockAddr::V4(input) => (input as *const sockaddr_in) as *const sockaddr,
             SockAddr::V6(input) => (input as *const sockaddr_in6) as *const sockaddr
         };
-        let retval = unsafe { bind(handle, cast_addr, 16) };
+        
+        let mut retval = 0;
+        if let SockAddr::V4(_addr) = addr {
+            retval = unsafe { bind(handle, cast_addr, 16) };
+        } else if let SockAddr::V6(_addr) = addr {
+            retval = unsafe { bind(handle, cast_addr, 64) };
+        }
+        
+        // let retval = unsafe { bind(handle, cast_addr, 16) };
         if retval != 0 {
             return Err(anyhow!(Error::last_os_error()));
         }
@@ -224,7 +232,7 @@ pub fn bind_to_ip(handle: i32, ip: &str) -> Result<()> {
 }
 
 
-fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
+pub fn string_to_sockaddr(ip: &str) -> Option<SockAddr> {
     let dest_ip = IpAddr::from_str(ip);
     if let Ok(IpAddr::V4(dest_ip)) = dest_ip {
         let mut ipcursor = Cursor::new(dest_ip.octets());

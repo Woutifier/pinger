@@ -54,11 +54,22 @@ fn main() {
 
     // Setup socket & (optionally) bind address
     let sockv4 = net::new_icmpv4_socket().expect("Could not create socket (v4)");
-    if !saddr.is_empty() {
-        net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
-    }
-
     let sockv6 = net::new_icmpv6_socket().expect("Could not create socket (v6)");
+    
+    //if !saddr.is_empty() {
+    //    net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
+    //}
+    
+    if !saddr.is_empty() {
+        let addr = net::string_to_sockaddr(&saddr);
+        if let Some(addr) = addr {
+            if let net::SockAddr::V4(_addr) = addr {
+                net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
+            } else if let net::SockAddr::V6(_addr) = addr {
+                net::bind_to_ip(sockv6, &saddr).expect("Could not bind socket to source address");
+            }
+        }
+    }
 
     
     // Read from STDIN
