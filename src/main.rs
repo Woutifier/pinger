@@ -56,10 +56,6 @@ fn main() {
     let sockv4 = net::new_icmpv4_socket().expect("Could not create socket (v4)");
     let sockv6 = net::new_icmpv6_socket().expect("Could not create socket (v6)");
     
-    //if !saddr.is_empty() {
-    //    net::bind_to_ip(sockv4, &saddr).expect("Could not bind socket to source address");
-    //}
-    
     if !saddr.is_empty() {
         let addr = net::string_to_sockaddr(&saddr);
         if let Some(addr) = addr {
@@ -77,8 +73,6 @@ fn main() {
     let stdin = io::stdin();
     let mut handle = stdin.lock();
 
-    // Create new ICMP-header (IPv4 and IPv6)
-    let icmp6header = net::ICMP6Header::echo_request(identifier, sequence_number).to_byte_array();
 
     // Initialize TokenBucketFilter for rate-limiting
     let mut tbf = tbf::TokenBucketFilter::new(rate);
@@ -91,8 +85,17 @@ fn main() {
         // Finding timestamp
         let now = SystemTime::now();
         let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+        //let addr = string_to_sockaddr(buffer.trim());
+        //if let Some(addr) = addr {
+        //    println!("Could send packet");
+        //} else {
+        //    println!("Could not send packet");
+	//} 
+
+	//Err(anyhow!(format!("Invalid IP-Address: {}", buffer.trim()).to_string()))
 
         let icmp4header = net::ICMP4Header::echo_request(identifier, sequence_number, since_the_epoch.as_secs(), since_the_epoch.subsec_nanos(), buffer.trim()).to_byte_array();
+        let icmp6header = net::ICMP6Header::echo_request(identifier, sequence_number, since_the_epoch.as_secs(), since_the_epoch.subsec_nanos()).to_byte_array();
 
         // Send packet
         let result = net::send_packet(sockv4, sockv6, buffer.trim(), &icmp4header, &icmp6header);

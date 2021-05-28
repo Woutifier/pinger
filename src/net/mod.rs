@@ -45,24 +45,28 @@ pub struct ICMP6Header {
     pub code: u8,
     pub checksum: u16,
     pub header: u32,
+    pub payload_sec: u64,
+    pub payload_nanosec: u32,
 }
 
 impl ICMP6Header {
-    pub fn echo_request(identifier: u16, sequence_number: u16) -> ICMP6Header {
+    pub fn echo_request(identifier: u16, sequence_number: u16, payload_sec: u64, payload_nanosec: u32) -> ICMP6Header {
         let header = ((identifier as u32) << 16) | (sequence_number as u32);
         let mut icmp6_header = ICMP6Header {
             icmp_type: 128,
             code: 0,
             checksum: 0,
             header: header,
+            payload_sec: payload_sec,
+            payload_nanosec: payload_nanosec,
         };
         let checksum = ICMP6Header::calc_checksum(&icmp6_header.to_byte_array());
         icmp6_header.checksum = checksum;
         icmp6_header
     }
 
-    pub fn to_byte_array(&self) -> [u8; 8] {
-        let mut buffer = [0; 8];
+    pub fn to_byte_array(&self) -> [u8; 20] {
+        let mut buffer = [0; 20];
         buffer[0] = self.icmp_type;
         buffer[1] = self.code;
         buffer[2] = (self.checksum >> 8 & 0xFF) as u8;
@@ -71,6 +75,19 @@ impl ICMP6Header {
         buffer[5] = (self.header >> 16 & 0xFF) as u8;
         buffer[6] = (self.header >> 8 & 0xFF) as u8;
         buffer[7] = (self.header & 0xFF) as u8;
+        // adding timestamp
+        buffer[8] = (self.payload_sec >> 56 & 0xFF) as u8;
+        buffer[9] = (self.payload_sec >> 48 & 0xFF) as u8;
+        buffer[10] = (self.payload_sec >> 40 & 0xFF) as u8;
+        buffer[11] = (self.payload_sec >> 32 & 0xFF) as u8;
+        buffer[12] = (self.payload_sec >> 24 & 0xFF) as u8;
+        buffer[13] = (self.payload_sec >> 16 & 0xFF) as u8;
+        buffer[14] = (self.payload_sec >> 8 & 0xFF) as u8;
+        buffer[15] = (self.payload_sec & 0xFF) as u8;
+        buffer[16] = (self.payload_nanosec >> 24 & 0xFF) as u8;
+        buffer[17] = (self.payload_nanosec >> 16 & 0xFF) as u8;
+        buffer[18] = (self.payload_nanosec >> 8 & 0xFF) as u8;
+        buffer[19] = (self.payload_nanosec & 0xFF) as u8;
         buffer
     }
 
@@ -108,21 +125,25 @@ pub struct ICMP4Header {
 impl ICMP4Header {
     pub fn echo_request(identifier: u16, sequence_number: u16, payload_sec: u64, payload_nanosec: u32, dest_ip: &str) -> ICMP4Header {
         let header = ((identifier as u32) << 16) | (sequence_number as u32);
-        
+
+        //let split = dest_ip.split(".");
+        //let vec: Vec<&str> = split.collect();
+        	
         let mut first_part: u8 = 0;
         let mut second_part: u8 = 0;
         let mut third_part: u8 = 0;
-        let mut fourth_part: u8 = 0;
+        let mut fourth_part: u8 = 0;	
         
-        let ip = IpAddr::from_str(dest_ip);
-        if let Ok(IpAddr::V4(_ip)) = ip {
-            let split = dest_ip.split(".");
-            let vec: Vec<&str> = split.collect();
+	let ip = IpAddr::from_str(dest_ip);
+	if let Ok(IpAddr::V4(_ip)) = ip {
+	    let split = dest_ip.split(".");
+	    let vec: Vec<&str> = split.collect();
             first_part = vec[0].parse().expect("Failed parsing ipv4 address");
             second_part = vec[1].parse().expect("Failed parsing ipv4 address");
             third_part = vec[2].parse().expect("Failed parsing ipv4 address");
             fourth_part = vec[3].parse().expect("Failed parsing ipv4 address");
         }
+
 
         let mut icmp4_header = ICMP4Header {
             icmp_type: 8,
@@ -136,7 +157,6 @@ impl ICMP4Header {
             dest_part3: third_part,
             dest_part4: fourth_part,
         };
-        
         let checksum = ICMP4Header::calc_checksum(&icmp4_header.to_byte_array());
         icmp4_header.checksum = checksum;
         icmp4_header
@@ -222,7 +242,7 @@ pub fn bind_to_ip(handle: i32, ip: &str) -> Result<()> {
             retval = unsafe { bind(handle, cast_addr, 64) };
         }
         
-        // let retval = unsafe { bind(handle, cast_addr, 16) };
+        //let retval = unsafe { bind(handle, cast_addr, 16) };
         if retval != 0 {
             return Err(anyhow!(Error::last_os_error()));
         }
